@@ -30,39 +30,15 @@ def _(mo):
 
 @app.cell
 def _(plt, sc, sns):
-    # QC Analysis Functions
+    # QC Analysis Functions - this is where we store the functions to analyze the data 
     qc_vars_default = [
         "Doublet score",
         "Fraction mitochondrial UMIs", 
         "Genes detected"
     ]
 
-    def create_qc_dataframe(adata):
-        """Convert AnnData to DataFrame for interactive plotting (cell-level)"""
-        import pandas as pd
-
-        # Get QC metrics and metadata
-        qc_columns = ['leiden', 'supertype', 'supertype_scANVI'] + qc_vars_default
-
-        # Filter to only include columns that exist in the adata object
-        available_columns = [col for col in qc_columns if col in adata.obs.columns]
-
-        plot_df = adata.obs[available_columns].copy()
-
-        # Add UMAP coordinates if available
-        if 'X_umap' in adata.obsm:
-            umap_coords = pd.DataFrame(
-                adata.obsm['X_umap'], 
-                columns=['UMAP1', 'UMAP2'],
-                index=adata.obs.index
-            )
-            plot_df = pd.concat([plot_df, umap_coords], axis=1)
-
-        return plot_df
-
-
     def plot_QC_metric_hist(adata, qc_metric):
-        """Return a matplotlib figure showing the distribution of per-cluster means for `qc_metric`."""
+        """Return a matplotlib figure showing the distribution of per-cluster means for the chosen QC metric."""
         if qc_metric not in adata.obs.columns:
             return None
 
@@ -201,17 +177,18 @@ def _(plt, sc, sns):
 
     return create_umap_plots, plot_QC_metric_hist, qc_vars_default
 
+# Now we start with the Marimo UI components 
 
 @app.cell
 def _(mo):
     # Data loading controls
     data_path = mo.ui.text(
         label="Path to .h5ad file",
-        value="test_data/All_scANVI.2025-05-13.h5ad",
+        value="test_data/All_scANVI.2025-05-13.h5ad", # Replace this with your actual scANVI output h5ad file
         full_width=True
     )
 
-    resolution_slider = mo.ui.slider(
+    resolution_slider = mo.ui.slider( # Leiden resolution is the granularity of the clustering - this is a hyperparameter that you can tune 
         start=0.1, 
         stop=10.0, 
         value=5.0, 
@@ -356,7 +333,7 @@ def _(adata, mo, plot_QC_metric_hist, qc_metric_selector):
         # Get some stats for threshold guidance
         cluster_means = adata.obs.groupby('leiden', observed=True)[qc_metric_selector.value].mean()
         overall_mean = adata.obs[qc_metric_selector.value].mean()
-        overall_std = adata.obs[qc_metric_selector.value].std()
+        overall_std = adata.obs[qc_metric_selector.value].std() # We can add more descriptive stats here to help users choose optimal thresholds 
 
         stats_text = mo.md(f"""
         **Statistics for {qc_metric_selector.value}:**
@@ -381,7 +358,7 @@ def _(adata, mo, plot_QC_metric_hist, qc_metric_selector):
 
 @app.cell
 def _(adata, mo, qc_metric_selector):
-    # Dynamic threshold slider based on selected metric
+    # Dynamic threshold slider based on selected metric: main control for user visualization 
     if qc_metric_selector.value in adata.obs.columns:
         metric_values = adata.obs[qc_metric_selector.value]
         metric_min = metric_values.min()
@@ -504,7 +481,6 @@ def _(
     else:
         content = mo.vstack([title_results, mo.md("Adjust the threshold slider above to see QC analysis plots")])
 
-    # This is the single last expression that gets displayed
     content
     return
 
@@ -540,6 +516,7 @@ def _(adata_result, flagged_clusters, mo):
         mo.md("No analysis results available")
     return
 
+# Future: add simple fn for saving figs and new truncated data based off of QC flags 
 
 if __name__ == "__main__":
     app.run()
